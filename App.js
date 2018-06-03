@@ -1,39 +1,82 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- * @flow
- */
-
 import React, { Component } from 'react';
 import {
   Platform,
   StyleSheet,
   Text,
-  View
+  View,
+  ActivityIndicator,
+  TouchableOpacity
 } from 'react-native';
 
-const instructions = Platform.select({
-  ios: 'Press Cmd+R to reload,\n' +
-    'Cmd+D or shake for dev menu',
-  android: 'Double tap R on your keyboard to reload,\n' +
-    'Shake or press menu button for dev menu',
+import { ApolloProvider, Query } from 'react-apollo';
+import ApolloClient from 'apollo-boost';
+import graphQL from 'graphql-tag';
+import numeral from "numeral";
+
+const client = new ApolloClient({
+  uri: `https://w5xlvm3vzz.lp.gql.zone/graphql`
 });
 
-type Props = {};
-export default class App extends Component<Props> {
+const ExchangeRateQuery = graphQL`
+  query rates($currency: String!) {
+    rates(currency: $currency) {
+      currency
+      rate
+    }
+  }
+`;
+
+export default class App extends Component {
+
+  state = {
+    currency: "USD"
+  };
+  
   render() {
+
+    const { currency : currentCurrency } = this.state;
+
     return (
-      <View style={styles.container}>
-        <Text style={styles.welcome}>
-          Welcome to React Native!
-        </Text>
-        <Text style={styles.instructions}>
-          To get started, edit App.js
-        </Text>
-        <Text style={styles.instructions}>
-          {instructions}
-        </Text>
-      </View>
+      <ApolloProvider client={client}>
+        <View style={styles.container}>
+          <Query query={ExchangeRateQuery} variables={{ currency: currentCurrency }}>
+          {({ loading, error, data }) => {
+            if (loading) return <ActivityIndicator color={'#287b97'} />;
+            if (error) return <Text>{`Error: ${error}`}</Text>;
+            console.log(data);
+            // return (
+            //   <View></View>
+            // )
+            return (
+              <View style={styles.containerInside}>
+                {data.rates
+                  .filter(
+                    ({ currency }) =>
+                      currency !== currentCurrency &&
+                      ["USD", "BTC", "LTC", "EUR", "JPY", "ETH"].includes(currency)
+                  )
+                  .map(({ currency, rate }, idx, rateArr) => (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      onPress={() => onCurrencyChange(currency)}
+                      style={[
+                        styles.currencyWrapper,
+                        idx === rateArr.length - 1 && { borderBottomWidth: 0 }
+                      ]}
+                      key={currency}
+                    >
+                      <Text style={styles.currency}>{currency}</Text>
+                      <Text style={styles.currency}>
+                        {rate > 1 ? numeral(rate).format("0,0.00") : rate}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            );
+          }}
+          </Query>
+        </View>
+      </ApolloProvider>
     );
   }
 }
@@ -43,7 +86,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5FCFF',
+    backgroundColor: '#2E3B4B',
   },
   welcome: {
     fontSize: 20,
@@ -55,4 +98,23 @@ const styles = StyleSheet.create({
     color: '#333333',
     marginBottom: 5,
   },
+
+  containerInside: {
+    width: "100%",
+    padding: 20
+  },
+  currencyWrapper: {
+    padding: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: '#287b97'
+  },
+  currency: {
+    // fontSize: fontSize.medium,
+    fontWeight: "100",
+    color: '#dee3e8',
+    letterSpacing: 4
+  }
 });
